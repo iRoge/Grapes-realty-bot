@@ -1,75 +1,94 @@
-const puppeteer = require('puppeteer');
+import puppeteer from 'puppeteer';
+import {DatabaseManager} from '../classes/DatabaseManager.js';
+import {TimeoutError} from '../classes/errors/TimeoutError.js';
+import {Advertisement} from '../classes/DTOs/Advertisement.js';
 
-run();
+(async () => {
+    const dataBaseManager = new DatabaseManager();
+    let existingAds = await dataBaseManager.getAds(1, 100);
 
-async function run() {
-    const args = [
+    let keysArray = [];
+    for (let key in existingAds) {
+        let ad = existingAds[key];
+        keysArray.push(dataBaseManager.getUniqueKey(ad.uniqueId, ad.siteId));
+    }
+
+    let args = [
         '--no-sandbox',
         // '--user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3312.0 Safari/537.36"',
         '--start-maximized',
         // "--disable-notifications",
         // '--disable-web-security',
-        // '--proxy-server=188.113.190.7:80'
+        // '--proxy-server=https://203.189.89.153:8080'
     ];
-    const browser = await puppeteer.launch({
-        headless: true,
+    let browser = await puppeteer.launch({
+        headless: false,
         args: args,
         defaultViewport: {
             width: 1920,
             height: 1080,
-        }
+        },
     });
 
-    const page = await browser.newPage();
-    await page.setDefaultNavigationTimeout(0);
-    page.on('console', msg => {
-        console.log(msg.text());
-    });
+    let page = (await browser.pages()).shift();
 
-    await page.goto('https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&type=4');
-    let newAnnounces = await page.evaluate(() => {
-        let announcements = document.querySelectorAll('._93444fe79c--card--ibP42');
-        let newAnnounces = [];
-        for (let an of announcements) {
-            let button = an.querySelector('button span._93444fe79c--text--rH6sj');
-            if (!button) {
-                continue;
+    while (true) {
+        try {
+            await page.goto('https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&type=4');
+
+            let ads = await page.$$('._93444fe79c--card--ibP42');
+            let newAds = [];
+            for (let ad of ads) {
+                let button = await ad.$('button span._93444fe79c--text--rH6sj');
+                if (!button) {
+                    continue;
+                }
+
+                let url = await ad.$eval('div[data-name="LinkArea"] a._93444fe79c--link--eoxce', elem => elem.getAttribute('href'));
+                let match = url.match(/\/rent\/flat\/(\d+)\//);
+                let uniqueId = match[1];
+
+                let key = dataBaseManager.getUniqueKey(uniqueId, 1);
+                if (keysArray.indexOf(key) !== -1) {
+                    console.log('Закончились новые объявления');
+                    break;
+                }
+
+                let newAd = new Advertisement;
+                newAd.uniqueId = uniqueId;
+                newAd.time = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                newAd.siteId = 1;
+
+                await button.click();
+                newAd.telephones = await ad.$$eval(
+                    'div._93444fe79c--button--j934Y div._93444fe79c--container--aWzpE > span[data-mark="PhoneValue"]',
+                        phoneBlocks => {
+                        return phoneBlocks.map(phoneBlock => phoneBlock.textContent)
+                    }
+                );
+
+                newAd.title = await ad.$eval('span[data-mark="OfferTitle"] span', elem => elem.innerHTML);
+                newAd.metro = await ad.$eval('a._93444fe79c--link--BwwJO div:nth-child(2)', elem => elem.innerHTML);
+
+                newAds.push(newAd)
             }
 
-            let url = an.querySelector('div[data-name="LinkArea"] a._93444fe79c--link--eoxce').getAttribute('href');
-            let match = url.match(/\/rent\/flat\/(\d+)\//);
-            let primaryKey = match[1];
-            /** Здесь должны быть проверки на уникальность перед записью **/
+            if (newAds.length) {
+                console.log('Добавляем ' + newAds.length + ' новых объявлений в базу');
+                for (let ad of newAds) {
+                    let key = dataBaseManager.getUniqueKey(ad.uniqueId, ad.siteId);
+                    keysArray.push(key);
+                }
 
-            let now = new Date();
-            let newAnnounce = {
-                id: primaryKey,
-                time: now.toDateString(),
-                title: null,
-                rooms: null,
-                announcesByPhone: null,
-                views: null,
-                noRealtor: null,
-                cost: null,
-                telephones: [],
-                metro: null,
-                photo: null,
-                city: null,
-            };
-            button.click();
-            let numbersDivs = an.querySelectorAll('div._93444fe79c--button--j934Y div._93444fe79c--container--aWzpE > span[data-mark="PhoneValue"]');
-            for (let numberDiv of numbersDivs) {
-                newAnnounce.telephones.push(numberDiv.innerHTML.trim());
+                await dataBaseManager.addAds(newAds);
             }
 
-            newAnnounce.title = an.querySelector('span[data-mark="OfferTitle"] span').innerHTML;
-            newAnnounce.metro = an.querySelector('a._93444fe79c--link--BwwJO div:nth-child(2)').innerHTML;
-
-            newAnnounces.push(newAnnounce)
+            console.log('Ждем 5 секунд');
+            await page.waitForTimeout(5);
+        } catch (error) {
+            console.log('Какая-то неизвестная ошибка: ' + error.message);
+            break;
         }
-        return newAnnounces;
-    });
+    }
 
-    console.log(newAnnounces);
-    await page.waitForTimeout(10000);
-}
+})()

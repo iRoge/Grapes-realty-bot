@@ -3,11 +3,17 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "dependencies": {
+    "esm": "^3.2.25",
     "nodejs": "^0.0.0",
-    "puppeteer": "^13.1.3"
+    "puppeteer": "^13.2.0",
+    "sync-mysql": "^3.0.1",
+    "sync-sql": "^1.0.2"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "dotenv": "^16.0.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
