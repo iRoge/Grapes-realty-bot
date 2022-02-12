@@ -70,6 +70,14 @@ import {Advertisement} from '../classes/DTOs/Advertisement.js';
                 newAd.title = await ad.$eval('span[data-mark="OfferTitle"] span', elem => elem.innerHTML);
                 newAd.metro = await ad.$eval('a._93444fe79c--link--BwwJO div:nth-child(2)', elem => elem.innerHTML);
 
+                newAd.viewsQty = null;
+                newAd.photo = null;
+                /** Где взять? **/
+                newAd.noRealtor = null;
+                newAd.city = null;
+                /** Где взять? **/
+                newAd.adsByPhoneQty = null;
+
                 newAds.push(newAd)
             }
 
@@ -90,5 +98,4 @@ import {Advertisement} from '../classes/DTOs/Advertisement.js';
             break;
         }
     }
-
 })()
