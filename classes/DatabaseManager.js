@@ -37,6 +37,7 @@ export class DatabaseManager {
             ad.title = row.title;
             ad.siteId = row.site_id;
             ad.viewsQty = row.views_qty;
+            ad.description = row.description;
             data[this.getUniqueKey(row.unique_id, row.site_id)] = ad;
         }
         return data;
@@ -65,7 +66,7 @@ export class DatabaseManager {
                     } else {
                         valuesToInsert.push('null');
                     }
-                } else if (ad[prop]) {
+                } else if (ad[prop] !== null) {
                     if ((typeof ad[prop]) === 'string') {
                         valuesToInsert.push("'" + ad[prop] + "'");
                     } else {

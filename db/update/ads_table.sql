@@ -10,7 +10,7 @@ create table ads
 	telephones text null,
 	metro varchar(255) null,
 	photo boolean null,
-	city varchar(255) null,
+	metro_distance varchar(255) null,
 	site_id smallint not null,
 	constraint ads_pk
 		primary key (id)
@@ -25,5 +25,9 @@ alter table ads
 
 alter table ads
 	add created_date datetime default CURRENT_TIMESTAMP not null;
+
+alter table ads
+	add description text default '' not null;
+
 
 

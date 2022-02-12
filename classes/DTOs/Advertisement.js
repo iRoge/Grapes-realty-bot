@@ -1,7 +1,7 @@
 export class Advertisement {
     id = null
     uniqueId = null
-    title = null
+    title = ''
     roomsQty = null
     adsByPhoneQty = null
     viewsQty = null
@@ -14,6 +14,8 @@ export class Advertisement {
     siteId = 1
     adAddedDate = null
     createdDate = null
+    description = ''
+    metroDistance = ''
 
     static getPropsToInsertMap()
     {
@@ -28,10 +30,11 @@ export class Advertisement {
             telephones: 'telephones',
             metro: 'metro',
             photo: 'photo',
-            city: 'city',
+            metroDistance: 'metro_distance',
             siteId: 'site_id',
             adAddedDate: 'ad_added_date',
             createdDate: 'created_date',
+            description: 'description',
         };
     }
 }
