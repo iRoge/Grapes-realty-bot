@@ -21,6 +21,9 @@ alter table ads
 	add unique_id varchar(255) not null;
 
 alter table ads
-	add time datetime default CURRENT_TIMESTAMP not null;
+	add ad_added_date datetime default CURRENT_TIMESTAMP not null;
+
+alter table ads
+	add created_date datetime default CURRENT_TIMESTAMP not null;
 
 

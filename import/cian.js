@@ -22,7 +22,7 @@ import {Advertisement} from '../classes/DTOs/Advertisement.js';
         // '--proxy-server=https://203.189.89.153:8080'
     ];
     let browser = await puppeteer.launch({
-        headless: false,
+        headless: true,
         args: args,
         defaultViewport: {
             width: 1920,
@@ -34,7 +34,7 @@ import {Advertisement} from '../classes/DTOs/Advertisement.js';
 
     while (true) {
         try {
-            await page.goto('https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&type=4');
+            await page.goto('https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&totime=3600&type=4');
 
             let ads = await page.$$('._93444fe79c--card--ibP42');
             let newAds = [];
@@ -56,7 +56,8 @@ import {Advertisement} from '../classes/DTOs/Advertisement.js';
 
                 let newAd = new Advertisement;
                 newAd.uniqueId = uniqueId;
-                newAd.time = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                let now = new Date();
+                newAd.createdDate = now.toISOString().slice(0, 19).replace('T', ' ');
                 newAd.siteId = 1;
 
                 await button.click();
@@ -70,6 +71,15 @@ import {Advertisement} from '../classes/DTOs/Advertisement.js';
                 newAd.title = await ad.$eval('span[data-mark="OfferTitle"] span', elem => elem.innerHTML);
                 newAd.metro = await ad.$eval('a._93444fe79c--link--BwwJO div:nth-child(2)', elem => elem.innerHTML);
 
+                let detailPage = await browser.newPage();
+                await detailPage.goto(url);
+                let dateAddedHtml = await detailPage.$eval('div[data-name="OfferAdded"]', elem => elem.innerHTML);
+                match = dateAddedHtml.match(/(\d\d):(\d\d)/);
+                let addedDate = new Date();
+                addedDate.setUTCHours(match[1]);
+                addedDate.setUTCMinutes(match[2]);
+                newAd.adAddedDate = addedDate.toISOString().slice(0, 19).replace('T', ' ');
+                console.log(newAd.adAddedDate);
                 newAd.viewsQty = null;
                 newAd.photo = null;
                 /** Где взять? **/
@@ -77,6 +87,8 @@ import {Advertisement} from '../classes/DTOs/Advertisement.js';
                 newAd.city = null;
                 /** Где взять? **/
                 newAd.adsByPhoneQty = null;
+
+                await detailPage.close();
 
                 newAds.push(newAd)
             }
@@ -91,8 +103,8 @@ import {Advertisement} from '../classes/DTOs/Advertisement.js';
                 await dataBaseManager.addAds(newAds);
             }
 
-            console.log('Ждем 5 секунд');
-            await page.waitForTimeout(5);
+            console.log('Ждем 2 секунд');
+            await page.waitForTimeout(2000);
         } catch (error) {
             console.log('Какая-то неизвестная ошибка: ' + error.message);
             break;

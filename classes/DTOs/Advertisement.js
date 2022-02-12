@@ -1,7 +1,6 @@
 export class Advertisement {
     id = null
     uniqueId = null
-    time = null
     title = null
     roomsQty = null
     adsByPhoneQty = null
@@ -13,12 +12,13 @@ export class Advertisement {
     photo = null
     city = null
     siteId = 1
+    adAddedDate = null
+    createdDate = null
 
     static getPropsToInsertMap()
     {
         return {
             uniqueId: 'unique_id',
-            time: 'time',
             title: 'title',
             roomsQty: 'rooms_qty',
             adsByPhoneQty: 'ads_by_phone_qty',
@@ -30,6 +30,8 @@ export class Advertisement {
             photo: 'photo',
             city: 'city',
             siteId: 'site_id',
+            adAddedDate: 'ad_added_date',
+            createdDate: 'created_date',
         };
     }
 }

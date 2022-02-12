@@ -23,7 +23,8 @@ export class DatabaseManager {
         for (let row of rows) {
             let ad = new Advertisement();
             ad.id = row.id;
-            ad.time = row.time;
+            ad.adAddedDate = row.ad_added_date;
+            ad.createdDate = row.created_date;
             ad.uniqueId = row.unique_id;
             ad.adsByPhoneQty = row.ads_by_phone_qty;
             ad.roomsQty = row.rooms_qty;
