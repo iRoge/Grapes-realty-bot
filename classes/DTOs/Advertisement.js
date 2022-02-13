@@ -9,13 +9,15 @@ export class Advertisement {
     cost = null
     telephones = []
     metro = null
-    photo = null
+    photosQty = null
     city = null
     siteId = 1
     adAddedDate = null
+    adCreatedDate = null
     createdDate = null
     description = ''
     metroDistance = ''
+    url = ''
 
     static getPropsToInsertMap()
     {
@@ -29,12 +31,14 @@ export class Advertisement {
             cost: 'cost',
             telephones: 'telephones',
             metro: 'metro',
-            photo: 'photo',
+            photosQty: 'photos_qty',
             metroDistance: 'metro_distance',
             siteId: 'site_id',
             adAddedDate: 'ad_added_date',
+            adCreatedDate: 'ad_created_date',
             createdDate: 'created_date',
             description: 'description',
+            url: 'url'
         };
     }
 }

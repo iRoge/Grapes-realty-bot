@@ -6,12 +6,15 @@
   "type": "module",
   "dependencies": {
     "esm": "^3.2.25",
+    "node-fetch": "^3.2.0",
     "nodejs": "^0.0.0",
     "puppeteer": "^13.2.0",
     "sync-mysql": "^3.0.1",
-    "sync-sql": "^1.0.2"
+    "sync-sql": "^1.0.2",
+    "axios": "^0.26.0"
   },
   "devDependencies": {
+    "axios": "^0.26.0",
     "dotenv": "^16.0.0"
   },
   "scripts": {

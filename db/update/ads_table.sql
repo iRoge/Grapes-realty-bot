@@ -1,3 +1,4 @@
+drop table if exists ads;
 create table ads
 (
 	id int auto_increment,
@@ -9,7 +10,7 @@ create table ads
 	cost int null,
 	telephones text null,
 	metro varchar(255) null,
-	photo boolean null,
+	photos_qty int null,
 	metro_distance varchar(255) null,
 	site_id smallint not null,
 	constraint ads_pk
@@ -21,13 +22,19 @@ alter table ads
 	add unique_id varchar(255) not null;
 
 alter table ads
-	add ad_added_date datetime default CURRENT_TIMESTAMP not null;
+	add ad_added_date datetime default CURRENT_TIMESTAMP null;
 
 alter table ads
 	add created_date datetime default CURRENT_TIMESTAMP not null;
 
 alter table ads
-	add description text default '' not null;
+	add description text not null;
+
+alter table ads
+	add url text not null;
+
+alter table ads
+	add ad_created_date datetime default CURRENT_TIMESTAMP null;
 
 
 
