@@ -1,6 +1,8 @@
 import {DatabaseManager} from "../DatabaseManager.js";
 import puppeteer from "puppeteer";
 import {Advertisement} from "../DTOs/Advertisement.js";
+import {Functions} from "../Functions.js";
+import proxyChain from'proxy-chain';
 
 const {Browser, Page} = puppeteer;
 
@@ -15,7 +17,20 @@ export class CianParser {
         this.#existingAds = await this.#getExistingAds();
 
         let page = (await this.#browser.pages()).shift();
-        await page.goto('https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&totime=3600&type=4');
+        let proxyUrl = 'http://api.scraperapi.com/?api_key=b9ba82b0cb711b6de6f05c9f47095fbf&url=https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&totime=600&type=4';
+        let url = 'https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&totime=600&type=4';
+        await page.goto(proxyUrl);
+        if (await page.$('form#form_captcha')) {
+            let result = await Functions.dealWithRecaptcha(page);
+            if (!result) {
+                console.log('Капча не решена');
+                await this.#browser.close();
+                return;
+            }
+            await page.goto(proxyUrl);
+        }
+
+
         let badButton = await page.$('div._25d45facb5--close--C4TsU')
         if (badButton) {
             await badButton.click();
@@ -73,6 +88,15 @@ export class CianParser {
             let detailPage = await this.#browser.newPage();
             await detailPage.goto(url);
 
+            if (await detailPage.$('form#form_captcha')) {
+                let result = await Functions.dealWithRecaptcha(page);
+                if (!result) {
+                    console.log('Капча не решена');
+                    await this.#browser.close();
+                    return;
+                }
+            }
+
             let isError = await detailPage.$('h5.error-code');
             if (isError) {
                 console.log('Ошибка на странице: ' + (await isError.evaluate(elem => elem.innerHTML)));
@@ -125,17 +149,21 @@ export class CianParser {
      * @returns {Browser}
      */
     static async #getBrowser() {
+        const oldProxyUrl = 'http://iroge27:hCnUejtHmt@193.38.234.46:59100';
+        const newProxyUrl = await proxyChain.anonymizeProxy(oldProxyUrl);
+
         let args = [
             '--no-sandbox',
-            // '--user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3312.0 Safari/537.36"',
+            '--disable-setuid-sandbox',
+            // '--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36"',
             '--start-maximized',
-            // "--disable-notifications",
-            // '--disable-web-security',
-            // '--proxy-server=https://203.189.89.153:8080'
+            "--disable-notifications",
+            '--disable-web-security',
+            // `--proxy-server=${newProxyUrl}`
         ];
 
         return await puppeteer.launch({
-            headless: true,
+            headless: false,
             args: args,
             defaultViewport: {
                 width: 1920,

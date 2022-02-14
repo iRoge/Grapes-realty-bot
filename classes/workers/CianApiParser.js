@@ -1,29 +1,37 @@
 import {DatabaseManager} from "../DatabaseManager.js";
 import {Advertisement} from "../DTOs/Advertisement.js";
-import nodeFetch from 'node-fetch';
-import {Functions} from "../Functions";
+import NodeFetch from 'node-fetch';
+import HttpsProxyAgent from 'https-proxy-agent';
+import {Functions} from "../Functions.js";
 import puppeteer from "puppeteer";
+const {Browser} = puppeteer;
 
 
 export class CianApiParser {
     #existingAds;
     #dataBaseManager;
     #browser;
+    countRequests = 0;
 
     async startParsing() {
         this.#dataBaseManager = await new DatabaseManager;
         this.#existingAds = await this.#getExistingAds();
 
         console.log('Парсер запущен');
+        console.time('Watcher');
         while (true) {
             try {
                 await this.parseResponse();
                 console.log('Iteration....');
-                await this.sleep(500);
+                await Functions.sleep(4000);
             } catch (error) {
-                console.log('Какая-то неизвестная ошибка: ' + error.message);
+                console.log('Какая-то ошибка: ');
+                console.log(error);
+                break;
             }
         }
+        console.log('Количество совершенных запросов: ' + this.countRequests);
+        console.timeEnd('Watcher');
     }
 
     /**
@@ -68,54 +76,54 @@ export class CianApiParser {
             }
         };
         let headers = {
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.82 Safari/537.36',
-            'sec-fetch-site': 'same-site',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-dest': 'empty',
-            'sec-ch-ua-platform': '"Windows"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="98", "Google Chrome";v="98"',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36"',
             'referer': 'https://www.cian.ru/',
             'origin': 'https://www.cian.ru',
-            'cookie': '_CIAN_GK=1c5a7ce6-fbd9-4713-af3f-3735d0e60eda; _gcl_au=1.1.982303988.1643829523; _ga=GA1.2.1997587419.1643829523; uxfb_usertype=searcher; tmr_lvidTS=1643829523064; tmr_lvid=8080b211529c464c80dcb5dcb76179f9; _ym_d=1643829523; _ym_uid=16438295231027092789; uxs_uid=ef837430-845c-11ec-a8a7-51ce581ff762; _fbp=fb.1.1643829523354.1465053188; afUserId=67209984-a052-4372-b2c9-ac34f2a81370-p; sopr_utm=%7B%22utm_source%22%3A+%22vk%22%2C+%22utm_medium%22%3A+%22social%22%7D; cookie_agreement_accepted=1; cf_clearance=6sbnZa9eZgFWDcInYHhOANw6kSeFMZO_70RMwu9BJVk-1643831071-0-150; pview=3; serp_registration_trigger_popup=1; _gid=GA1.2.1474750472.1644666021; AF_SYNC=1644666022349; is_push_declined=true; serp_stalker_banner=1; session_main_town_region_id=1; session_region_id=1; first_visit_time=1644750862075; login_mro_popup=1; _ym_isad=2; __cf_bm=63xTFD7YGluqYPEB63MdB_9pCQ1YnkWRqBe4oOeZ5Sw-1644753390-0-AcBU6y6vkkuXh7HKOAFcb6TDKXbuSQG4BYVwbrks8OgEO4N5YqIGyO9EtHCRPHmREZRTMFvRyun6B3NvNjprflU=; sopr_session=2ab9cb8cb39a4217; _dc_gtm_UA-30374201-1=1; _ym_visorc=w; cto_bundle=_IBkiF9ubXJTaHF6UnQzJTJCT24xV1RBRlFwRHFyWXhrTlBtWSUyQlFvTSUyRnBEOXZkRE5sVkhiM012bXNCbFVuemQ5ZGN2eCUyQiUyRkRORWhxRWhxS2dZcXpYeDVOJTJCTE1KUkpDVThMWVo5cmxZTU91MmdVMUtvYTRKRWElMkZaOVFVMHQ2Ym5ZVmFDZnNDemUyJTJGeiUyQk8zQVhSSTdLbTQxY0hOZ1ElM0QlM0Q; tmr_reqNum=167',
             'content-type': 'text/plain;charset=UTF-8',
             'content-length': '299',
             'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
             'accept-encoding': 'gzip, deflate, br',
             'accept': '*/*',
         };
-        let res = await nodeFetch(
-            'https://api.cian.ru/search-offers/v2/search-offers-desktop/', {
+        let proxyUrl = 'http://api.scraperapi.com/?api_key=b9ba82b0cb711b6de6f05c9f47095fbf&url=https://api.cian.ru/search-offers/v2/search-offers-desktop/';
+        let url = 'https://api.cian.ru/search-offers/v2/search-offers-desktop/';
+        let proxy = 'http://iroge27:hCnUejtHmt@193.38.234.46:59100';
+        const proxyAgent = new HttpsProxyAgent(proxyUrl);
+
+        let res = await NodeFetch(
+            proxyUrl, {
                 method: 'POST',
                 body: JSON.stringify(body),
-                headers: headers
+                headers: headers,
+                // agent: proxyAgent
             }
         );
+        this.countRequests++;
 
         let responseBody = await res.text();
         if (!Functions.isJson(responseBody)) {
-            let browser = this.#getBrowser();
-            let page = (await browser.pages()).shift();
+            throw new Error('Вылезла капча');
+            console.log('Найдена капча');
+            let browser = await this.#getBrowser();
+            let page = await browser.newPage();
             await page.goto('https://www.cian.ru/');
-            let recaptchaDealt = await Functions.dealWithRecaptcha(page);
-            if (recaptchaDealt) {
-                throw new Error('Рекапча не была решена');
+            let result = await Functions.dealWithRecaptcha(page);
+            await page.close();
+            if (!result) {
+                throw new Error('Не удалось решить капчу');
+            } else {
+                return null;
             }
         }
-
         let resBody = JSON.parse(responseBody).data;
         if (!resBody) {
             throw new Error('Пришел пустой ответ от сервера cian');
         }
-
-
-
         let ads = resBody.offersSerialized;
         if (!ads || !ads.length) {
-            console.log('Новых объявлений нет');
+            console.log('Объявлений за период нет');
             return false;
         }
-
         for (let ad of ads) {
             let key = this.#dataBaseManager.getUniqueKey(ad.cianId, 1);
             if (this.#existingAds.indexOf(key) !== -1) {
@@ -164,6 +172,9 @@ export class CianApiParser {
         }
     };
 
+    /**
+     * @returns {Browser}
+     */
     async #getBrowser() {
         if (this.#browser) {
             return this.#browser;
@@ -179,7 +190,7 @@ export class CianApiParser {
         ];
 
         this.#browser = await puppeteer.launch({
-            headless: true,
+            headless: false,
             args: args,
             defaultViewport: {
                 width: 1920,
@@ -200,13 +211,5 @@ export class CianApiParser {
         }
 
         return keysArray;
-    }
-
-    sleep(milliseconds) {
-        const date = Date.now();
-        let currentDate = null;
-        do {
-            currentDate = Date.now();
-        } while (currentDate - date < milliseconds);
     }
 }
