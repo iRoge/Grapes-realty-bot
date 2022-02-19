@@ -1,10 +1,11 @@
 import Mysql from 'sync-mysql';
 import dotenv from 'dotenv';
-import {Advertisement} from "./DTOs/Advertisement.js";
+import Advertisement from "./DTOs/Advertisement.js";
+import Proxy from "./DTOs/Proxy.js";
 
 dotenv.config();
 
-export class DatabaseManager {
+export default class DatabaseManager {
     _connection;
     constructor()
     {
@@ -32,13 +33,13 @@ export class DatabaseManager {
             ad.cost = row.cost;
             ad.metro = row.metro;
             ad.noRealtor = row.no_realtor;
-            ad.photo = row.photo;
+            ad.photosQty = row.photos_qty;
             ad.telephones = JSON.parse(row.telephones);
             ad.title = row.title;
             ad.siteId = row.site_id;
             ad.viewsQty = row.views_qty;
             ad.description = row.description;
-            data[this.getUniqueKey(row.unique_id, row.site_id)] = ad;
+            data[ad.getUniqueKey()] = ad;
         }
         return data;
     }
@@ -82,8 +83,61 @@ export class DatabaseManager {
         return this._connection.query(sql);
     }
 
-    getUniqueKey(uniqueId, siteId)
+    async getProxies()
     {
-        return uniqueId + '_site_' + siteId;
+        let rows = this._connection.query('SELECT * from proxy WHERE status = 1');
+        let data = [];
+        for (let row of rows) {
+            let proxy = new Proxy();
+            proxy.id = row.id;
+            proxy.status = row.status;
+            proxy.ip = row.ip;
+            proxy.port = row.port;
+            proxy.protocol = row.protocol;
+            proxy.login = row.login;
+            proxy.password = row.password;
+            proxy.sourceId = row.source_id;
+            data.push(proxy);
+        }
+        return data;
+    }
+
+    /**
+     * @returns {Promise<*>}
+     * @param {Proxy[]} proxies
+     */
+    async addProxies(proxies)
+    {
+        let fieldsToInsert = [];
+        let propMap = Proxy.getPropsToInsertMap();
+        for (let prop in propMap) {
+            fieldsToInsert.push(propMap[prop]);
+        }
+        let sql = 'INSERT INTO ads (' + fieldsToInsert.join(', ') + ') VALUES ';
+        let arValuesToInsert = [];
+
+        for (let proxy of proxies) {
+            let valuesToInsert = [];
+            for (let prop in propMap) {
+                if (Array.isArray(proxy[prop])) {
+                    if (proxy[prop].length) {
+                        valuesToInsert.push("'" + JSON.stringify(proxy[prop]) + "'");
+                    } else {
+                        valuesToInsert.push('null');
+                    }
+                } else if (proxy[prop] !== null) {
+                    if ((typeof proxy[prop]) === 'string') {
+                        valuesToInsert.push("'" + proxy[prop] + "'");
+                    } else {
+                        valuesToInsert.push(proxy[prop]);
+                    }
+                } else {
+                    valuesToInsert.push('null');
+                }
+            }
+            arValuesToInsert.push('(' + valuesToInsert.join(', ') + ')');
+        }
+        sql += arValuesToInsert.join(', ');
+        return this._connection.query(sql);
     }
 }

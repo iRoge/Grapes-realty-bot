@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const {Browser, Page} = puppeteer;
 
-export class Functions {
+export default class Functions {
     /**
      * @param {Page} page
      * @returns {Promise<boolean>}

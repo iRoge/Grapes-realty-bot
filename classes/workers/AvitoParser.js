@@ -6,19 +6,15 @@ const {Browser, Page} = puppeteer;
 
 export class AvitoParser {
     #existingAds;
-    #browser;
     #dataBaseManager;
 
     async startParsing() {
         this.#dataBaseManager = await new DatabaseManager;
-        this.#browser = await AvitoParser.#getBrowser();
         this.#existingAds = await this.#getExistingAds();
 
-        let page = (await this.#browser.pages()).shift();
-        await page.goto('https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&totime=3600&type=4');
         while (true) {
             try {
-                await this.parsePage(page);
+                await this.parsePage();
             } catch (error) {
                 console.log('Какая-то неизвестная ошибка: ' + error.message);
             }
@@ -26,20 +22,15 @@ export class AvitoParser {
     }
 
     /**
-     *
-     * @param {Page} page
      * @returns {Promise<void>}
      */
-    async parsePage(page) {
-        let ads = await page.$$('._93444fe79c--card--ibP42');
-        for (let ad of ads.reverse()) {
-            let button = await ad.$('button span._93444fe79c--text--rH6sj');
-            if (!button) {
-                continue;
-            }
+    async parsePage() {
+        let ads = [];
+
+        for (let ad of ads) {
             let uniqueId = null;
 
-            let key = this.#dataBaseManager.getUniqueKey(uniqueId, 1);
+            let key = ad.getUniqueKey();
             if (this.#existingAds.indexOf(key) !== -1) {
                 break;
             }
@@ -49,7 +40,7 @@ export class AvitoParser {
             newAd.uniqueId = uniqueId;
             let now = new Date();
             newAd.createdDate = now.toISOString().slice(0, 19).replace('T', ' ');
-            newAd.siteId = 1;
+            newAd.siteId = 2;
             newAd.telephones = null;
             newAd.metroDistance = null;
             newAd.metro = null;
@@ -68,14 +59,6 @@ export class AvitoParser {
             await this.#dataBaseManager.addAds([newAd]);
 
         }
-
-        await page.waitForTimeout(2000);
-        let reloadSelector = 'button._93444fe79c--button--Cp1dl._93444fe79c--button--IqIpq._93444fe79c--XS--Q3OqJ._93444fe79c--button--OhHnj';
-        await page.$eval(reloadSelector, elem => {
-            window.scrollTo(0, elem.scrollHeight)
-        })
-        console.log('Перезагружаем страницу');
-        await (await page.$(reloadSelector)).click();
     }
 
     /**
@@ -107,7 +90,7 @@ export class AvitoParser {
         let keysArray = [];
         for (let key in existingAds) {
             let ad = existingAds[key];
-            keysArray.push(this.#dataBaseManager.getUniqueKey(ad.uniqueId, ad.siteId));
+            keysArray.push(ad.getUniqueKey());
         }
 
         return keysArray;

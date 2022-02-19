@@ -1,12 +1,12 @@
-import {DatabaseManager} from "../DatabaseManager.js";
+import DatabaseManager from "../DatabaseManager.js";
 import puppeteer from "puppeteer";
-import {Advertisement} from "../DTOs/Advertisement.js";
-import {Functions} from "../Functions.js";
+import Advertisement from "../DTOs/Advertisement.js";
+import Functions from "../Functions.js";
 import proxyChain from'proxy-chain';
 
 const {Browser, Page} = puppeteer;
 
-export class CianParser {
+export default class CianParser {
     #existingAds;
     #browser;
     #dataBaseManager;
@@ -17,10 +17,17 @@ export class CianParser {
         this.#existingAds = await this.#getExistingAds();
 
         let page = (await this.#browser.pages()).shift();
+        await page.authenticate({
+            username: 'iroge27',
+            password: 'hCnUejtHmt'
+        })
+        console.log('Парсер puppeteer запущен');
         let proxyUrl = 'http://api.scraperapi.com/?api_key=b9ba82b0cb711b6de6f05c9f47095fbf&url=https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&totime=600&type=4';
         let url = 'https://www.cian.ru/cat.php?deal_type=rent&engine_version=2&is_by_homeowner=1&offer_type=flat&region=1&sort=creation_date_desc&totime=600&type=4';
-        await page.goto(proxyUrl);
+        await page.goto(url);
         if (await page.$('form#form_captcha')) {
+            console.log('Капча на старте');
+            return;
             let result = await Functions.dealWithRecaptcha(page);
             if (!result) {
                 console.log('Капча не решена');
@@ -52,7 +59,7 @@ export class CianParser {
      */
     async parsePage(page) {
         let ads = await page.$$('._93444fe79c--card--ibP42');
-        for (let ad of ads.reverse()) {
+        for (let ad of ads) {
             let button = await ad.$('button span._93444fe79c--text--rH6sj');
             if (!button) {
                 continue;
@@ -62,26 +69,23 @@ export class CianParser {
             let match = url.match(/\/rent\/flat\/(\d+)\//);
             let uniqueId = match[1];
 
-            let key = this.#dataBaseManager.getUniqueKey(uniqueId, 1);
-            if (this.#existingAds.indexOf(key) !== -1) {
-                break;
-            }
-            console.log('Обрабатываем элемент');
-
             let newAd = new Advertisement;
             newAd.uniqueId = uniqueId;
-            let now = new Date();
-            newAd.createdDate = now.toISOString().slice(0, 19).replace('T', ' ');
             newAd.siteId = 1;
-            newAd.url = url;
-
-            await button.click();
             newAd.telephones = await ad.$$eval(
                 'div._93444fe79c--button--j934Y div._93444fe79c--container--aWzpE > span[data-mark="PhoneValue"]',
                 phoneBlocks => {
                     return phoneBlocks.map(phoneBlock => phoneBlock.textContent)
                 }
             );
+            let key = newAd.getUniqueKey();
+            if (this.#existingAds.indexOf(key) !== -1) {
+                break;
+            }
+            let now = new Date();
+            newAd.createdDate = now.toISOString().slice(0, 19).replace('T', ' ');
+            newAd.url = url;
+            await button.click();
             newAd.metroDistance = await ad.$eval('div._93444fe79c--remoteness--q8IXp', elem => elem.innerHTML);
             newAd.metro = await ad.$eval('a._93444fe79c--link--BwwJO div:nth-child(2)', elem => elem.innerHTML);
 
@@ -149,8 +153,7 @@ export class CianParser {
      * @returns {Browser}
      */
     static async #getBrowser() {
-        const oldProxyUrl = 'http://iroge27:hCnUejtHmt@193.38.234.46:59100';
-        const newProxyUrl = await proxyChain.anonymizeProxy(oldProxyUrl);
+        const proxyUrl = 'http://193.38.234.46:59100';
 
         let args = [
             '--no-sandbox',
@@ -159,7 +162,7 @@ export class CianParser {
             '--start-maximized',
             "--disable-notifications",
             '--disable-web-security',
-            // `--proxy-server=${newProxyUrl}`
+            `--proxy-server=${proxyUrl}`
         ];
 
         return await puppeteer.launch({
@@ -178,7 +181,7 @@ export class CianParser {
         let keysArray = [];
         for (let key in existingAds) {
             let ad = existingAds[key];
-            keysArray.push(this.#dataBaseManager.getUniqueKey(ad.uniqueId, ad.siteId));
+            keysArray.push(ad.getUniqueKey());
         }
 
         return keysArray;

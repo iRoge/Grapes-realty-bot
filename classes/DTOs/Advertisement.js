@@ -1,4 +1,4 @@
-export class Advertisement {
+export default class Advertisement {
     id = null
     uniqueId = null
     title = ''
@@ -18,6 +18,11 @@ export class Advertisement {
     description = ''
     metroDistance = ''
     url = ''
+
+    getUniqueKey()
+    {
+        return this.uniqueId + '_site_' + this.siteId + '_phones_' + this.telephones.join('|');
+    }
 
     static getPropsToInsertMap()
     {

@@ -1,45 +1,56 @@
-import {DatabaseManager} from "../DatabaseManager.js";
-import {Advertisement} from "../DTOs/Advertisement.js";
+import DatabaseManager from "../DatabaseManager.js";
+import Advertisement from "../DTOs/Advertisement.js";
 import NodeFetch from 'node-fetch';
 import HttpsProxyAgent from 'https-proxy-agent';
-import {Functions} from "../Functions.js";
+import Functions from "../Functions.js";
 import puppeteer from "puppeteer";
+import proxyChain from "proxy-chain";
+import ProxyIsNotValidError from "../errors/ProxyIsNotValidError.js";
+import Proxy from "../DTOs/Proxy.js";
 const {Browser} = puppeteer;
 
 
-export class CianApiParser {
+export default class CianApiParser {
     #existingAds;
     #dataBaseManager;
     #browser;
+    #proxies;
     countRequests = 0;
+    proxyIterationNumber = 0;
 
     async startParsing() {
         this.#dataBaseManager = await new DatabaseManager;
         this.#existingAds = await this.#getExistingAds();
+        this.#proxies = await this.#dataBaseManager.getProxies();
 
-        console.log('Парсер запущен');
+        console.log('Парсер по API запущен');
         console.time('Watcher');
         while (true) {
             try {
-                await this.parseResponse();
-                console.log('Iteration....');
-                await Functions.sleep(4000);
+                let proxy = null;
+                // let proxy = this.getNextProxyUrl();
+                // console.log('Используем прокси ' + proxy.ip);
+                await this.parseResponse(proxy);
             } catch (error) {
-                console.log('Какая-то ошибка: ');
-                console.log(error);
-                break;
+                if (error instanceof ProxyIsNotValidError) {
+                    console.log(error);
+                } else {
+                    console.log(error);
+                }
             }
+            let pauseSeconds = 10;
+            console.log('Ждем ' + pauseSeconds + ' сек');
+            await Functions.sleep(pauseSeconds * 1000);
         }
         console.log('Количество совершенных запросов: ' + this.countRequests);
         console.timeEnd('Watcher');
     }
 
     /**
-     *
-     * @param {Page} page
      * @returns {Promise<void>}
+     * @param {Proxy} proxy
      */
-    async parseResponse(page) {
+    async parseResponse(proxy = null) {
         let body = {
             jsonQuery: {
                 engine_version: {
@@ -62,7 +73,7 @@ export class CianApiParser {
                 },
                 publish_period: {
                     type: "term",
-                    value: 600
+                    value: 300
                 },
                 region: {
                     type: "terms",
@@ -76,34 +87,53 @@ export class CianApiParser {
             }
         };
         let headers = {
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36"',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.82 Safari/537.36',
             'referer': 'https://www.cian.ru/',
             'origin': 'https://www.cian.ru',
             'content-type': 'text/plain;charset=UTF-8',
-            'content-length': '299',
+            'content-length': '192',
             'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
             'accept-encoding': 'gzip, deflate, br',
             'accept': '*/*',
+            'sec-fetch-site': 'same-site',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-dest': 'empty',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="98", "Google Chrome";v="98"',
+            // ':authority': 'api.cian.ru',
+            // ':method': 'POST',
+            // ':path': '/search-offers/v2/search-offers-desktop/',
+            // ':scheme': 'https',
         };
-        let proxyUrl = 'http://api.scraperapi.com/?api_key=b9ba82b0cb711b6de6f05c9f47095fbf&url=https://api.cian.ru/search-offers/v2/search-offers-desktop/';
-        let url = 'https://api.cian.ru/search-offers/v2/search-offers-desktop/';
-        let proxy = 'http://iroge27:hCnUejtHmt@193.38.234.46:59100';
-        const proxyAgent = new HttpsProxyAgent(proxyUrl);
+        let res = null;
+        if (proxy) {
+            let url = 'https://api.cian.ru/search-offers/v2/search-offers-desktop/';
+            const proxyAgent = new HttpsProxyAgent(proxy.getProxyUrl());
+            res = await NodeFetch(
+                url, {
+                    method: 'POST',
+                    body: JSON.stringify(body),
+                    headers: headers,
+                    agent: proxyAgent
+                }
+            );
+        } else {
+            let url = 'http://api.scraperapi.com/?api_key=b9ba82b0cb711b6de6f05c9f47095fbf&url=https://api.cian.ru/search-offers/v2/search-offers-desktop/';
+            res = await NodeFetch(
+                url, {
+                    method: 'POST',
+                    body: JSON.stringify(body),
+                    headers: headers,
+                }
+            );
+        }
 
-        let res = await NodeFetch(
-            proxyUrl, {
-                method: 'POST',
-                body: JSON.stringify(body),
-                headers: headers,
-                // agent: proxyAgent
-            }
-        );
         this.countRequests++;
 
         let responseBody = await res.text();
         if (!Functions.isJson(responseBody)) {
-            throw new Error('Вылезла капча');
-            console.log('Найдена капча');
+            throw new ProxyIsNotValidError('Ответ не в формате json.');
             let browser = await this.#getBrowser();
             let page = await browser.newPage();
             await page.goto('https://www.cian.ru/');
@@ -124,12 +154,8 @@ export class CianApiParser {
             console.log('Объявлений за период нет');
             return false;
         }
+        let newAdFlag = false;
         for (let ad of ads) {
-            let key = this.#dataBaseManager.getUniqueKey(ad.cianId, 1);
-            if (this.#existingAds.indexOf(key) !== -1) {
-                break;
-            }
-
             if (!ad.phones || !ad.phones.length) {
                 console.log('Не нашелся телефон в объявлении');
                 this.#existingAds.push(key);
@@ -137,18 +163,29 @@ export class CianApiParser {
             }
 
             let newAd = new Advertisement;
+            for (let phone of ad.phones) {
+                newAd.telephones.push(phone.countryCode + phone.number)
+            }
+
+            newAd.siteId = 1;
             newAd.uniqueId = ad.cianId;
+
+            let key = newAd.getUniqueKey();
+            if (this.#existingAds.indexOf(key) !== -1) {
+                break;
+            }
+
+            if (ad.roomsCount > 3) {
+                continue;
+            }
             let now = new Date();
             newAd.createdDate = now.toISOString().slice(0, 19).replace('T', ' ');
             let addedDate = new Date(ad.addedTimestamp * 1000);
             newAd.adAddedDate = addedDate.toISOString().slice(0, 19).replace('T', ' ');
             let createdDate = new Date(ad.creationDate);
             newAd.adCreatedDate = createdDate.toISOString().slice(0, 19).replace('T', ' ');
-            newAd.siteId = 1;
+
             newAd.url = ad.fullUrl;
-            for (let phone of ad.phones) {
-                newAd.telephones.push(phone.countryCode + phone.number)
-            }
             let metro = ad.geo.undergrounds.shift();
             if (!metro) {
                 console.log('Не нашлось метро в объявлении');
@@ -169,6 +206,11 @@ export class CianApiParser {
             console.log('Добавляем новое объявление в базу');
             this.#existingAds.push(key);
             await this.#dataBaseManager.addAds([newAd]);
+            newAdFlag = true;
+        }
+
+        if (!newAdFlag) {
+            console.log('Нет новых объявлений');
         }
     };
 
@@ -207,9 +249,21 @@ export class CianApiParser {
         let keysArray = [];
         for (let key in existingAds) {
             let ad = existingAds[key];
-            keysArray.push(this.#dataBaseManager.getUniqueKey(ad.uniqueId, ad.siteId));
+            keysArray.push(ad.getUniqueKey());
         }
 
         return keysArray;
+    }
+
+    getNextProxyUrl() {
+        if (!this.#proxies.length) {
+            throw Error('Нет доступных прокси');
+        }
+        let proxy = this.#proxies[this.proxyIterationNumber];
+        this.proxyIterationNumber++;
+        if (this.proxyIterationNumber >= this.#proxies.length) {
+            this.proxyIterationNumber = 0;
+        }
+        return proxy;
     }
 }

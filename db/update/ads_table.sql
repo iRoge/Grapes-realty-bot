@@ -36,5 +36,16 @@ alter table ads
 alter table ads
 	add ad_created_date datetime default CURRENT_TIMESTAMP null;
 
-
+drop table if exists proxy;
+create table proxy
+(
+    id       int auto_increment
+        primary key,
+    status   tinyint(1)                                 default 1      not null,
+    ip       varchar(255)                                              not null,
+    port     int                                                       not null,
+    protocol enum ('http', 'https', 'socks4', 'socks5') default 'http' not null,
+    login    varchar(255)                                              null,
+    password varchar(255)                                              null
+);
 
