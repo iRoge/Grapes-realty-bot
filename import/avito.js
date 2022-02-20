@@ -1,5 +1,5 @@
-import CianParser from "../classes/workers/CianParser.js";
+import AvitoParser from "../classes/workers/AvitoParser.js";
 
-let cianParser = new CianApiParser();
-cianParser.startParsing();
+let parser = new AvitoParser();
+parser.startParsing();
 

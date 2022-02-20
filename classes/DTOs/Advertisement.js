@@ -12,8 +12,11 @@ export default class Advertisement {
     photosQty = null
     city = null
     siteId = 1
+    /** Дата добавления объявления **/
     adAddedDate = null
+    /** Дата создания объявления **/
     adCreatedDate = null
+    /** Дата создания строчки в базе **/
     createdDate = null
     description = ''
     metroDistance = ''
