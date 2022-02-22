@@ -107,6 +107,7 @@ export default class CianApiParser {
             // ':scheme': 'https',
         };
         let res = null;
+        console.time('Время запроса циан');
         if (proxy) {
             let url = 'https://api.cian.ru/search-offers/v2/search-offers-desktop/';
             const proxyAgent = new HttpsProxyAgent(proxy.getProxyUrl());
@@ -130,6 +131,7 @@ export default class CianApiParser {
             );
             console.timeEnd('Время запроса на циан');
         }
+        console.timeEnd('Время запроса циан');
 
         this.countRequests++;
 

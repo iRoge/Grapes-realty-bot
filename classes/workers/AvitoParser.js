@@ -22,9 +22,11 @@ export default class AvitoParser {
         while (true) {
             try {
                 await this.parsePage();
+                await Functions.sleep(10000);
             } catch (error) {
                 console.log('Какая-то неизвестная ошибка');
                 console.log(error);
+                break;
             }
             Functions.sleep(5000);
         }
@@ -74,6 +76,7 @@ export default class AvitoParser {
         }
         for (let ad of ads) {
             let uniqueId = ad.getAttribute('data-item-id');
+            console.time('Время запроса картинки');
             let url = 'https://www.avito.ru/web/1/items/phone/' + uniqueId + '?h=36&searchHash=hiavfo0pb8r13fqz3phjxr061i43508&vsrc=s';
             let res = await NodeFetch(
                 url, {
@@ -81,6 +84,7 @@ export default class AvitoParser {
                     headers: headers,
                 }
             );
+            console.timeEnd('Время запроса картинки');
             let body = await res.text();
             if (res.status !== 200) {
                 throw new RequestError('Ошибка при запросе изображения: ' + res.statusText);
@@ -95,9 +99,11 @@ export default class AvitoParser {
                 console.log(res);
                 throw new RequestError('Ошибка при запросе изображения')
             }
+            console.time('Время обработки картинки');
             fs.writeFileSync('1.png', Buffer.from(imageInfo['image64'].replace('data:image/png;base64,', ''), 'base64'));
             let phone = await this.recognizeImage(fs.readFileSync('1.png'), 'rus');
             fs.rmSync('1.png');
+            console.timeEnd('Время обработки картинки');
             phone = phone.replace(/\s/g, '').replace(/-/g, '').replace('8', '7');
             let newAd = new Advertisement;
             newAd.uniqueId = uniqueId;
