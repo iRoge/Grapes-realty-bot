@@ -26,6 +26,7 @@ export default class AvitoParser {
                 console.log('Какая-то неизвестная ошибка');
                 console.log(error);
             }
+            Functions.sleep(5000);
         }
     }
 
@@ -55,7 +56,8 @@ export default class AvitoParser {
         };
 
         console.time('Время запроса на авито');
-        let url = 'http://api.scraperapi.com/?api_key=b9ba82b0cb711b6de6f05c9f47095fbf&url=https://www.avito.ru/moskva/kvartiry/sdam-ASgBAgICAUSSA8gQ?f=ASgBAQICAUSSA8gQAUDMCESSWZBZjlmMWQ&s=104&user=1';
+        let url = 'https://www.avito.ru/moskva/kvartiry/sdam-ASgBAgICAUSSA8gQ?f=ASgBAQICAUSSA8gQAUDMCESSWZBZjlmMWQ&s=104&user=1';
+        // let url = 'http://api.scraperapi.com/?api_key=b9ba82b0cb711b6de6f05c9f47095fbf&url=https://www.avito.ru/moskva/kvartiry/sdam-ASgBAgICAUSSA8gQ?f=ASgBAQICAUSSA8gQAUDMCESSWZBZjlmMWQ&s=104&user=1';
         let res = await NodeFetch(
             url, {
                 method: 'GET',
@@ -67,6 +69,9 @@ export default class AvitoParser {
         let body = await res.text();
         let htmlDOM = parse(body);
         let ads = htmlDOM.querySelectorAll('div[data-marker="item"]');
+        if (!ads.length) {
+            throw new RequestError('Ни одного объявления в результате запроса не было найдено')
+        }
         for (let ad of ads) {
             let uniqueId = ad.getAttribute('data-item-id');
             let url = 'https://www.avito.ru/web/1/items/phone/' + uniqueId + '?h=36&searchHash=hiavfo0pb8r13fqz3phjxr061i43508&vsrc=s';
@@ -77,12 +82,18 @@ export default class AvitoParser {
                 }
             );
             let body = await res.text();
+            if (res.status !== 200) {
+                throw new RequestError('Ошибка при запросе изображения: ' + res.statusText);
+            }
+
             if (!Functions.isJson(body)) {
-                throw new RequestError('Ошибка при запросе изображения: ' + res)
+                console.log(res);
+                throw new RequestError('Ошибка при запросе изображения');
             }
             let imageInfo = JSON.parse(body);
             if (!imageInfo.hasOwnProperty('image64')) {
-                throw new RequestError('Ошибка при запросе изображения: ' + res)
+                console.log(res);
+                throw new RequestError('Ошибка при запросе изображения')
             }
             fs.writeFileSync('1.png', Buffer.from(imageInfo['image64'].replace('data:image/png;base64,', ''), 'base64'));
             let phone = await this.recognizeImage(fs.readFileSync('1.png'), 'rus');
@@ -105,18 +116,37 @@ export default class AvitoParser {
             newAd.adAddedDate = null;
             newAd.adCreatedDate = null;
             let geoBlock = ad.querySelector('div.geo-georeferences-SEtee');
+            if (!geoBlock) {
+                throw new RequestError('Не найден гео блок в объявлении');
+            }
             let match = geoBlock.querySelector('span:nth-child(3)').innerText.match(/\d+.+(км|м)$/);
             newAd.metroDistance = match[0].replace(/ /, ' ');
             newAd.metro = geoBlock.querySelector('span:nth-child(2)').innerText;
-            newAd.title = ad.querySelector('h3[itemprop="name"]').innerHTML.replace(/ /, ' ');
-            newAd.url = 'https://www.avito.ru' + ad.querySelector('a.iva-item-sliderLink-uLz1v').getAttribute('href');
+            let titleBlock = ad.querySelector('h3[itemprop="name"]');
+            if (!titleBlock) {
+                throw new RequestError('Не найден заголовочный блок в объявлении');
+            }
+            newAd.title = titleBlock.innerHTML.replace(/ /, ' ');
+            let urlBlock = ad.querySelector('a.iva-item-sliderLink-uLz1v');
+            if (!urlBlock) {
+                throw new RequestError('Не найден ссылочный блок в объявлении');
+            }
+            newAd.url = 'https://www.avito.ru' + urlBlock.getAttribute('href');
             newAd.viewsQty = null;
             newAd.roomsQty = null;
-            newAd.description = ad.querySelector('div.iva-item-text-Ge6dR.iva-item-description-FDgK4').innerHTML;
+            let descriptionBlock = ad.querySelector('div.iva-item-text-Ge6dR.iva-item-description-FDgK4');
+            if (!descriptionBlock) {
+                throw new RequestError('Не найден блок описания в объявлении');
+            }
+            newAd.description = descriptionBlock.innerHTML;
             newAd.photosQty = null;
             newAd.noRealtor = null;
             newAd.adsByPhoneQty = null;
-            match = ad.querySelector('span.price-text-_YGDY').innerHTML.replace(/\s+/, '').replace('&nbsp;', '').match(/\d+/);
+            let costBlock = ad.querySelector('span.price-text-_YGDY');
+            if (!costBlock) {
+                throw new RequestError('Не найден блок цены в объявлении');
+            }
+            match = costBlock.innerHTML.replace(/\s+/, '').replace('&nbsp;', '').match(/\d+/);
             newAd.cost = match[0];
 
             console.log('Добавляем новое объявление в базу');

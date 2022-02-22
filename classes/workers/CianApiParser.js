@@ -38,7 +38,7 @@ export default class CianApiParser {
                     console.log(error);
                 }
             }
-            let pauseSeconds = 10;
+            let pauseSeconds = 1;
             console.log('Ждем ' + pauseSeconds + ' сек');
             await Functions.sleep(pauseSeconds * 1000);
         }
@@ -120,6 +120,7 @@ export default class CianApiParser {
             );
         } else {
             let url = 'http://api.scraperapi.com/?api_key=b9ba82b0cb711b6de6f05c9f47095fbf&url=https://api.cian.ru/search-offers/v2/search-offers-desktop/';
+            console.time('Время запроса на циан');
             res = await NodeFetch(
                 url, {
                     method: 'POST',
@@ -127,6 +128,7 @@ export default class CianApiParser {
                     headers: headers,
                 }
             );
+            console.timeEnd('Время запроса на циан');
         }
 
         this.countRequests++;
